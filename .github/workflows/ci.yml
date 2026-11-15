@@ -1,0 +1,127 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CRATCHET_IMAGE: cratchet-dev
+  VCPKG_CACHE_DIR: ${{ github.workspace }}/.cache/vcpkg
+
+# Every job: build the shared toolchain image (layer-cached), restore the vcpkg
+# binary cache, then run commands inside the image via scripts/in_container.sh.
+# Job names below are the required status checks for branch protection.
+jobs:
+  build-test:
+    name: build-test (${{ matrix.compiler }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: clang-18
+            cc: clang-18
+            cxx: clang++-18
+          - compiler: gcc-13
+            cc: gcc-13
+            cxx: g++-13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build toolchain image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/dev.Dockerfile
+          load: true
+          tags: ${{ env.CRATCHET_IMAGE }}
+          cache-from: type=gha,scope=toolchain
+          cache-to: type=gha,scope=toolchain,mode=max
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_CACHE_DIR }}
+          key: vcpkg-${{ matrix.compiler }}-${{ hashFiles('vcpkg.json', 'docker/dev.Dockerfile') }}
+          restore-keys: vcpkg-${{ matrix.compiler }}-
+      - name: Configure
+        env: { CC: "${{ matrix.cc }}", CXX: "${{ matrix.cxx }}" }
+        run: scripts/in_container.sh cmake --preset dev -DCRATCHET_WERROR=ON
+      - name: Build
+        env: { CC: "${{ matrix.cc }}", CXX: "${{ matrix.cxx }}" }
+        run: scripts/in_container.sh cmake --build --preset dev
+      - name: Test
+        env: { CC: "${{ matrix.cc }}", CXX: "${{ matrix.cxx }}" }
+        run: scripts/in_container.sh ctest --preset dev
+
+  sanitize-asan-ubsan:
+    name: sanitize (asan+ubsan)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build toolchain image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/dev.Dockerfile
+          load: true
+          tags: ${{ env.CRATCHET_IMAGE }}
+          cache-from: type=gha,scope=toolchain
+          cache-to: type=gha,scope=toolchain,mode=max
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_CACHE_DIR }}
+          key: vcpkg-asan-${{ hashFiles('vcpkg.json', 'docker/dev.Dockerfile') }}
+          restore-keys: vcpkg-asan-
+      - name: Configure
+        run: scripts/in_container.sh cmake --preset asan -DCRATCHET_WERROR=ON
+      - name: Build
+        run: scripts/in_container.sh cmake --build --preset asan
+      - name: Test
+        run: scripts/in_container.sh ctest --preset asan
+
+  clang-tidy:
+    name: clang-tidy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build toolchain image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/dev.Dockerfile
+          load: true
+          tags: ${{ env.CRATCHET_IMAGE }}
+          cache-from: type=gha,scope=toolchain
+          cache-to: type=gha,scope=toolchain,mode=max
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_CACHE_DIR }}
+          key: vcpkg-tidy-${{ hashFiles('vcpkg.json', 'docker/dev.Dockerfile') }}
+          restore-keys: vcpkg-tidy-
+      - name: Configure (for compile_commands.json and dependency headers)
+        run: scripts/in_container.sh cmake --preset dev
+      - name: Run clang-tidy
+        run: >
+          scripts/in_container.sh bash -c
+          "find src apps tests bench -name '*.cpp'
+          | xargs clang-tidy-18 -p build/dev --quiet"
+
+  format:
+    name: format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-format-18
+      - name: Check formatting
+        run: >
+          git ls-files '*.cpp' '*.hpp'
+          | xargs clang-format-18 --dry-run --Werror

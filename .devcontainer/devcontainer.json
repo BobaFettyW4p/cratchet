@@ -1,0 +1,21 @@
+{
+  "name": "cratchet",
+  "build": {
+    "dockerfile": "../docker/dev.Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "ubuntu",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "llvm-vs-code-extensions.vscode-clangd",
+        "ms-vscode.cmake-tools",
+        "xaver.clang-format"
+      ],
+      "settings": {
+        "cmake.useCMakePresets": "always",
+        "clangd.arguments": ["--compile-commands-dir=${workspaceFolder}/build/dev"]
+      }
+    }
+  }
+}
