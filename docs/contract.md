@@ -39,10 +39,18 @@ tick that passes validation is published back to the subject it was read from
 so on. As written, each tick loops forever, and the gateway and snapshotter
 see each tick many times.
 
+**Fix (LedgerFlux branch `fix-normalizer-loop`, pending merge):** the ingestor
+publishes to stream `market_raw` (`market.raw.<shard>`). The normalizer reads
+that stream and writes `market_ticks` (`market.ticks.<shard>`), which the
+gateway and snapshotter already consume. The normalizer now refuses to start
+if its input and output are the same.
+
 **Consequence for Cratchet:** Cratchet takes over the work of both the
-ingestor and the normalizer (validation moves into Cratchet; see §5). In the
-Cratchet deployment, **the Python normalizer is not run**. Fixing the loop in
-LedgerFlux itself, for the Python-only baseline, is a separate LedgerFlux issue.
+ingestor and the normalizer (validation moves into Cratchet; see §5), so it
+publishes validated ticks **directly to `market.ticks.<shard>`**. In the
+Cratchet deployment, the Python ingestor and normalizer are not run.
+The Python baseline for comparison is ingestor → `market.raw` → normalizer →
+`market.ticks`.
 
 ## 2. Wire message: `Tick`
 
@@ -320,7 +328,5 @@ Recording: `scripts/capture_coinbase.py` writes JSON Lines of
 
 - **Stage 2 depth source:** unauthenticated `level2_batch` plus consistency
   checks (§9), or authenticated `level2` / FIX for real incremental updates.
-- **Python baseline for benchmarks**: because of the normalizer loop (§1), any
-  "Python pipeline" throughput number measured on current LedgerFlux is not
-  meaningful. Either fix the loop upstream first, or benchmark only the Python
-  ingestor process against Cratchet.
+- **Python baseline for benchmarks**: measure only after the LedgerFlux loop fix
+  (§1) is merged and deployed. Numbers from before the fix are not meaningful.
