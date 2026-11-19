@@ -157,8 +157,11 @@ in `seq` on the tick stream are not data loss. Order is what matters: the
 normalizer logs (but does not reject) `seq` lower than the last seen for that
 product (`normalizer/app.py:182-189`).
 
-Stage 2 note: gap detection on `level2` uses that channel's own sequencing and
-must not be inferred from `Tick.seq`.
+Observed 2026-11-19: 713 ticker messages over 20 s for three products had 710
+forward jumps and 0 backward steps. Gaps are the norm.
+
+Stage 2 note: `level2_batch` messages carry **no** sequence number (see §9),
+so book gap detection can't come from the depth channel or from `Tick.seq`.
 
 ### Heartbeats
 
@@ -271,11 +274,52 @@ and add `cratchet_*` histograms with µs-scale buckets for the benchmark story.
    `ts_event`; `ts_ingest` is not compared.
 4. Assert the shard for every product matches `shard_product`.
 
+## 9. Coinbase channel access (checked 2026-11-19)
+
+Probed `wss://ws-feed.exchange.coinbase.com` without credentials:
+
+| Channel | Unauthenticated? | Notes |
+|---|---|---|
+| `ticker` | yes | what LedgerFlux uses today |
+| `heartbeat` | yes | 1/s per product; carries `sequence` and `last_trade_id` |
+| `level2_batch` | yes | server reports it as `level2_50` (50 ms batches) |
+| `level2`, `level3`, `full` | **no** | `"level2, level3, and full channels now require authentication"` |
+
+Message shapes seen:
+
+- `ticker`: `sequence`, `product_id`, `price`, `last_size`, `best_bid`,
+  `best_bid_size`, `best_ask`, `best_ask_size`, `side`, `time`, `trade_id`,
+  plus 24 h/30 d stats. Prices and sizes are decimal strings.
+- `snapshot` (once per product, on subscribe): `product_id`, `time`, full-depth
+  `bids`/`asks` as `[price, size]` string pairs. ADA-USD had 668 bid and
+  7,128 ask levels. **No sequence number.**
+- `l2update`: `product_id`, `time`, `changes: [[side, price, new_size], …]`,
+  where `side` is `buy`/`sell` and size `"0"` removes the level. On average 25
+  changes per message, up to 237. **No sequence number.**
+
+Rates (three products, 20 s sample): ~36 ticker/s, ~41 l2update/s
+(~1,000 level changes/s), 3 heartbeat/s. That's low, which confirms that the
+benchmark story has to rely on high-speed replay.
+
+**Consequences for Stage 2 (book integrity without sequence numbers):**
+
+- A dropped `l2update` can't be detected from the depth channel itself.
+- Usable consistency checks:
+  1. **Ticker cross-check:** `ticker` carries a sequenced `best_bid`/`best_ask`.
+     The book's top of book should match at roughly the same time.
+  2. **Periodic REST snapshot:** compare the book against
+     `GET /products/<id>/book?level=2`.
+  3. **Resubscribe on disconnect:** a fresh `snapshot` resets the book.
+- Alternative: use the authenticated `level2` channel or the FIX market data
+  gateway, which needs a free API key. Decide at the start of Stage 2.
+
+Recording: `scripts/capture_coinbase.py` writes JSON Lines of
+`{"recv_ns", "msg"}` with the raw frame text, into `data/` (gitignored).
+
 ## Open items
 
-- **Coinbase channel access** (next step): confirm `level2` / `level2_batch`
-  are still unauthenticated on `ws-feed.exchange.coinbase.com`, and record
-  `ticker` + `level2` to `data/`.
+- **Stage 2 depth source:** unauthenticated `level2_batch` plus consistency
+  checks (§9), or authenticated `level2` / FIX for real incremental updates.
 - **Python baseline for benchmarks**: because of the normalizer loop (§1), any
   "Python pipeline" throughput number measured on current LedgerFlux is not
   meaningful. Either fix the loop upstream first, or benchmark only the Python

@@ -48,8 +48,10 @@ LedgerFlux (gateway, snapshotter, Postgres, Grafana) keeps working.
   endpoints) in [`docs/contract.md`](docs/contract.md).
 - **Gap to close:** the current ingestor subscribes to Coinbase `ticker` +
   `heartbeat` only (top of book). The order book needs depth data
-  (`level2` / `level2_batch`). **Verify** which channels Coinbase Exchange
-  currently allows unauthenticated before Stage 2.
+  (`level2` / `level2_batch`). Checked 2026-11-19: `level2_batch` (50 ms
+  batches) is unauthenticated, `level2` needs an API key, and neither the
+  depth snapshot nor the updates carry sequence numbers. See `docs/contract.md` §9.
+  Coinbase stays the venue, because like-for-like ingestor replacement is the point.
 
 ## Infrastructure
 
@@ -180,6 +182,8 @@ optimized, why, and what the numbers were on documented hardware.
 
 - Always-on public deployment, or reproducible `make up` only?
 - Is the Linux benchmark machine definitely available, and what toolchain does it have?
+- Stage 2 depth source: unauthenticated `level2_batch` + consistency checks, or
+  authenticated `level2` / FIX market data for real incremental updates?
 
 ## Resolved
 
