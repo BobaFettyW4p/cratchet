@@ -1,0 +1,13 @@
+---
+# GoogleTest and Google Benchmark macros generate code that trips several checks
+# that are valuable in src/ but pure noise here.
+InheritParentConfig: true
+Checks: >
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  -cppcoreguidelines-special-member-functions,
+  -cppcoreguidelines-macro-usage,
+  -cppcoreguidelines-pro-type-vararg,
+  -readability-identifier-naming,
+  -bugprone-throwing-static-initialization,
+  -misc-*
