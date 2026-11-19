@@ -43,8 +43,9 @@ LedgerFlux (gateway, snapshotter, Postgres, Grafana) keeps working.
 }
 ```
 
-- Timestamps are nanoseconds. Shard assignment must match the Python hashing
-  of `product` (**TODO: read `services/ingestor/app.py` and replicate exactly**).
+- Timestamps are nanoseconds. Shard = SHA-256(`product`) as a big-endian
+  integer mod `num_shards`. Full contract (fields, validation, config, metrics,
+  endpoints) in [`docs/contract.md`](docs/contract.md).
 - **Gap to close:** the current ingestor subscribes to Coinbase `ticker` +
   `heartbeat` only (top of book). The order book needs depth data
   (`level2` / `level2_batch`). **Verify** which channels Coinbase Exchange
@@ -98,14 +99,14 @@ LedgerFlux (gateway, snapshotter, Postgres, Grafana) keeps working.
   check) starts after Stage 0, as the opening of Stage 1.
 
 **Tasks:**
-- [ ] Dockerfile + Dev Container (Clang 18, GCC 13, CMake, vcpkg)
-- [ ] CMake skeleton, `CMakePresets.json`, vcpkg manifest (pinned baseline),
+- [x] Dockerfile + Dev Container (Clang 18, GCC 13, CMake, vcpkg)
+- [x] CMake skeleton, `CMakePresets.json`, vcpkg manifest (pinned baseline),
       `src/` + `apps/` + `tests/` + `bench/` layout, `Result<T,E>` header
-- [ ] `.clang-format`, `.clang-tidy`, `LICENSE` (MIT)
-- [ ] GitHub Actions: build + test on Linux (Clang + GCC), ASan+UBSan job,
+- [x] `.clang-format`, `.clang-tidy`, `LICENSE` (MIT)
+- [x] GitHub Actions: build + test on Linux (Clang + GCC), ASan+UBSan job,
       clang-tidy job, format check, vcpkg binary cache
-- [ ] Branch protection on `main` with the above checks required
-- [ ] README with the tagline, a one-paragraph architecture sketch, and the
+- [x] Branch protection on `main` with the above checks required
+- [x] README with the tagline, a one-paragraph architecture sketch, and the
       architecture/`-march` note
 
 **Done when:** a "hello" test builds and passes in CI with sanitizers, and `main`
