@@ -43,12 +43,15 @@ LedgerFlux (gateway, snapshotter, Postgres, Grafana) keeps working.
 }
 ```
 
-- Timestamps are nanoseconds. Shard assignment must match the Python hashing
-  of `product` (**TODO: read `services/ingestor/app.py` and replicate exactly**).
+- Timestamps are nanoseconds. Shard = SHA-256(`product`) as a big-endian
+  integer mod `num_shards`. Full contract (fields, validation, config, metrics,
+  endpoints) in [`docs/contract.md`](docs/contract.md).
 - **Gap to close:** the current ingestor subscribes to Coinbase `ticker` +
   `heartbeat` only (top of book). The order book needs depth data
-  (`level2` / `level2_batch`). **Verify** which channels Coinbase Exchange
-  currently allows unauthenticated before Stage 2.
+  (`level2` / `level2_batch`). Checked 2026-11-19: `level2_batch` (50 ms
+  batches) is unauthenticated, `level2` needs an API key, and neither the
+  depth snapshot nor the updates carry sequence numbers. See `docs/contract.md` §9.
+  Coinbase stays the venue, because like-for-like ingestor replacement is the point.
 
 ## Infrastructure
 
@@ -98,14 +101,14 @@ LedgerFlux (gateway, snapshotter, Postgres, Grafana) keeps working.
   check) starts after Stage 0, as the opening of Stage 1.
 
 **Tasks:**
-- [ ] Dockerfile + Dev Container (Clang 18, GCC 13, CMake, vcpkg)
-- [ ] CMake skeleton, `CMakePresets.json`, vcpkg manifest (pinned baseline),
+- [x] Dockerfile + Dev Container (Clang 18, GCC 13, CMake, vcpkg)
+- [x] CMake skeleton, `CMakePresets.json`, vcpkg manifest (pinned baseline),
       `src/` + `apps/` + `tests/` + `bench/` layout, `Result<T,E>` header
-- [ ] `.clang-format`, `.clang-tidy`, `LICENSE` (MIT)
-- [ ] GitHub Actions: build + test on Linux (Clang + GCC), ASan+UBSan job,
+- [x] `.clang-format`, `.clang-tidy`, `LICENSE` (MIT)
+- [x] GitHub Actions: build + test on Linux (Clang + GCC), ASan+UBSan job,
       clang-tidy job, format check, vcpkg binary cache
-- [ ] Branch protection on `main` with the above checks required
-- [ ] README with the tagline, a one-paragraph architecture sketch, and the
+- [x] Branch protection on `main` with the above checks required
+- [x] README with the tagline, a one-paragraph architecture sketch, and the
       architecture/`-march` note
 
 **Done when:** a "hello" test builds and passes in CI with sanitizers, and `main`
@@ -179,6 +182,8 @@ optimized, why, and what the numbers were on documented hardware.
 
 - Always-on public deployment, or reproducible `make up` only?
 - Is the Linux benchmark machine definitely available, and what toolchain does it have?
+- Stage 2 depth source: unauthenticated `level2_batch` + consistency checks, or
+  authenticated `level2` / FIX market data for real incremental updates?
 
 ## Resolved
 
