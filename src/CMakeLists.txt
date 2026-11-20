@@ -3,6 +3,7 @@ find_package(simdjson CONFIG REQUIRED)
 
 add_library(cratchet_core STATIC
   capture.cpp
+  config.cpp
   coinbase/parser.cpp
   json.cpp
   normalizer.cpp

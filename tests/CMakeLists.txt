@@ -3,6 +3,7 @@ find_package(GTest CONFIG REQUIRED)
 add_executable(cratchet_tests
   capture_test.cpp
   coinbase_parser_test.cpp
+  config_test.cpp
   hello_test.cpp
   json_test.cpp
   normalizer_test.cpp

@@ -238,8 +238,16 @@ existing stream. Otherwise, optionally delete it, then create it with
 `subjects = ["<prefix>.*"]`. NATS connect retries with exponential backoff
 (1, 2, 4, 8 s…) for up to 60 s.
 
+The ingestor calls `load_nats_config(stream_name=..., subject_prefix=...)`
+with the values from its own config (or their defaults). Because explicit
+arguments win, `JS_STREAM_NAME`, `JS_SUBJECT_PREFIX` and the file's
+`stream_name`/`subject_prefix` only take effect if the ingestor config sets
+those keys to empty strings.
+
 Cratchet reads the **same two files at the same paths**, so the existing
-ConfigMaps work unchanged.
+ConfigMaps work unchanged (`include/cratchet/config.hpp`). One difference: it
+requires correctly typed JSON values, where Python coerces with `str()` and
+`int()`, and it rejects an empty product list or `num_shards` of 0 at startup.
 
 ## 7. Operational surface
 

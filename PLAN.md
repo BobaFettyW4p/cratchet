@@ -120,7 +120,7 @@ requires the CI checks to merge.
       (`std::variant` for message types, `std::string_view` / `std::span` on the hot path)
 - [x] Normalize to the `Tick` schema with LedgerFlux validation and sharding
 - [ ] Publish to NATS JetStream on `market.ticks.<shard>`
-- [ ] Config via JSON (match LedgerFlux `ingestor.json` shape)
+- [x] Config via JSON (match LedgerFlux `ingestor.json` shape)
 - [ ] Prometheus metrics: messages/sec, parse latency, publish latency, reconnects
 - [ ] Record raw feed to a file (needed for Stage 2 replay)
 - [x] Contract test: Python `Tick` model validates every message Cratchet emits
