@@ -177,8 +177,10 @@ so book gap detection can't come from the depth channel or from `Tick.seq`.
 ### Heartbeats
 
 The ingestor subscribes to `heartbeat` but ignores it (`ingestor/app.py:179`).
-Cratchet should use heartbeats for liveness (stale-feed detection and
-reconnect) and must not publish them as ticks.
+Cratchet uses them for liveness and does not publish them as ticks: with
+heartbeats subscribed, 5 s without any frame closes the connection and
+reconnects (60 s without them). The Python ingestor never reconnects; its
+WebSocket loop exits on the first disconnect.
 
 ### Other message types
 
@@ -238,8 +240,23 @@ existing stream. Otherwise, optionally delete it, then create it with
 `subjects = ["<prefix>.*"]`. NATS connect retries with exponential backoff
 (1, 2, 4, 8 s…) for up to 60 s.
 
+Cratchet (`include/cratchet/nats_publisher.hpp`) does the same, with two
+deliberate differences. It publishes asynchronously and counts
+acknowledgements on the client library's threads, where Python awaits each
+publish. And after the first connect it reconnects forever, buffering
+publishes meanwhile; a NATS restart mid-run lost no messages in testing. A
+message that gets no ack within 5 s counts as failed.
+
+The ingestor calls `load_nats_config(stream_name=..., subject_prefix=...)`
+with the values from its own config (or their defaults). Because explicit
+arguments win, `JS_STREAM_NAME`, `JS_SUBJECT_PREFIX` and the file's
+`stream_name`/`subject_prefix` only take effect if the ingestor config sets
+those keys to empty strings.
+
 Cratchet reads the **same two files at the same paths**, so the existing
-ConfigMaps work unchanged.
+ConfigMaps work unchanged (`include/cratchet/config.hpp`). One difference: it
+requires correctly typed JSON values, where Python coerces with `str()` and
+`int()`, and it rejects an empty product list or `num_shards` of 0 at startup.
 
 ## 7. Operational surface
 
@@ -285,7 +302,10 @@ and add `cratchet_*` histograms with µs-scale buckets for the benchmark story.
    `ts_event`; `ts_ingest` is not compared.
 4. Assert the shard for every product matches `shard_product`.
 
-Status: all four steps run in the CI `contract` job. `cratchet normalize`
+Status: all four steps run in the CI `contract` job, which then also
+publishes the sample to a real JetStream server (`cratchet normalize
+--publish`) and reads it back with nats-py and `Tick.model_validate`, as the
+gateway and snapshotter do (`scripts/nats_check.py`). `cratchet normalize`
 replays the committed sample (`tests/data/`) and prints each tick as it would be
 published (`<subject>\t<json>`). `scripts/contract_check.py` then runs
 LedgerFlux's own transform, normalizer validation, `Tick` model and

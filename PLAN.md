@@ -115,14 +115,14 @@ LedgerFlux (gateway, snapshotter, Postgres, Grafana) keeps working.
 requires the CI checks to merge.
 
 ### Stage 1 — Feed handler + normalizer (~2–3 weeks)
-- [ ] WebSocket client (Beast) with TLS, reconnect + backoff, heartbeat handling
+- [x] WebSocket client (Beast) with TLS, reconnect + backoff, heartbeat handling
 - [x] Parse Coinbase messages with simdjson into typed structs
       (`std::variant` for message types, `std::string_view` / `std::span` on the hot path)
 - [x] Normalize to the `Tick` schema with LedgerFlux validation and sharding
-- [ ] Publish to NATS JetStream on `market.ticks.<shard>`
-- [ ] Config via JSON (match LedgerFlux `ingestor.json` shape)
+- [x] Publish to NATS JetStream on `market.ticks.<shard>`
+- [x] Config via JSON (match LedgerFlux `ingestor.json` shape)
 - [ ] Prometheus metrics: messages/sec, parse latency, publish latency, reconnects
-- [ ] Record raw feed to a file (needed for Stage 2 replay)
+- [x] Record raw feed to a file (needed for Stage 2 replay)
 - [x] Contract test: Python `Tick` model validates every message Cratchet emits
       (CI `contract` job, against a pinned LedgerFlux commit)
 

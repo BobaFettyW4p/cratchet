@@ -1,6 +1,8 @@
 ---
 # GoogleTest and Google Benchmark macros generate code that trips several checks
-# that are valuable in src/ but pure noise here.
+# that are valuable in src/ but pure noise here. The in-process WebSocket test server
+# passes streams by reference into coroutines it awaits immediately, and swallows
+# disconnect errors on purpose.
 InheritParentConfig: true
 Checks: >
   -cppcoreguidelines-owning-memory,
@@ -10,4 +12,6 @@ Checks: >
   -cppcoreguidelines-pro-type-vararg,
   -readability-identifier-naming,
   -bugprone-throwing-static-initialization,
-  -misc-*
+  -misc-*,
+  -cppcoreguidelines-avoid-reference-coroutine-parameters,
+  -bugprone-empty-catch

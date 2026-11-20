@@ -6,6 +6,9 @@
 #   CRATCHET_IMAGE   image tag (default: cratchet-dev)
 #   VCPKG_CACHE_DIR  host dir for the vcpkg binary cache (default: .cache/vcpkg)
 #   CC, CXX          compiler for this run (default: from the image, Clang 18)
+#   CRATCHET_DOCKER_NETWORK  docker network to join, e.g. one with a NATS server for
+#                    integration tests, or "host" in CI
+#   CRATCHET_NATS_URL  passed through; enables the NATS integration tests
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -16,11 +19,15 @@ mkdir -p "${cache_dir}"
 env_args=()
 [[ -n "${CC:-}" ]] && env_args+=(-e "CC=${CC}")
 [[ -n "${CXX:-}" ]] && env_args+=(-e "CXX=${CXX}")
+[[ -n "${CRATCHET_NATS_URL:-}" ]] && env_args+=(-e "CRATCHET_NATS_URL=${CRATCHET_NATS_URL}")
+net_args=()
+[[ -n "${CRATCHET_DOCKER_NETWORK:-}" ]] && net_args+=(--network "${CRATCHET_DOCKER_NETWORK}")
 
 exec docker run --rm \
   --user "$(id -u):$(id -g)" \
   -e HOME=/tmp \
   ${env_args[@]+"${env_args[@]}"} \
+  ${net_args[@]+"${net_args[@]}"} \
   -v "${repo_root}:/workspace" \
   -v "${cache_dir}:/vcpkg-cache" \
   -w /workspace \

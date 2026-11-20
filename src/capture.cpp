@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <stdexcept>
 
+#include "cratchet/json.hpp"
+
 namespace cratchet {
 
 capture_reader::capture_reader(const std::string& path) : in_(path), path_(path) {
@@ -32,6 +34,34 @@ std::optional<capture_frame> capture_reader::next() {
                              R"x(: not a capture line ({"recv_ns": int, "msg": string}))x");
   }
   return frame;
+}
+
+capture_writer::capture_writer(const std::string& path)
+    : out_(path, std::ios::binary | std::ios::app), path_(path) {
+  if (!out_) {
+    throw std::runtime_error("cannot open capture " + path + " for writing");
+  }
+}
+
+void capture_writer::write(std::int64_t recv_ns, std::string_view msg) {
+  line_.clear();
+  line_ += R"({"recv_ns": )";
+  json::append_int(line_, recv_ns);
+  line_ += R"(, "msg": )";
+  json::append_string(line_, msg);
+  line_ += "}\n";
+  out_.write(line_.data(), static_cast<std::streamsize>(line_.size()));
+  if (!out_) {
+    throw std::runtime_error("write to capture " + path_ + " failed");
+  }
+  ++frames_;
+}
+
+void capture_writer::flush() {
+  out_.flush();
+  if (!out_) {
+    throw std::runtime_error("flush of capture " + path_ + " failed");
+  }
 }
 
 }  // namespace cratchet

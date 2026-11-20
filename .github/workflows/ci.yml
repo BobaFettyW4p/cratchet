@@ -128,7 +128,9 @@ jobs:
 
   # docs/contract.md §8: run Cratchet over the committed capture and check every tick with
   # LedgerFlux's own Python code (transform, validation, Tick model, shard_product) at a
-  # pinned commit. Bump LEDGERFLUX_COMMIT when LedgerFlux's Tick or ingestor changes.
+  # pinned commit; then publish the same ticks to a real JetStream server and read them back
+  # the way LedgerFlux consumers do. Bump LEDGERFLUX_COMMIT when LedgerFlux's Tick, ingestor
+  # or stream setup changes.
   contract:
     name: contract (ledgerflux)
     runs-on: ubuntu-24.04
@@ -159,7 +161,7 @@ jobs:
       - name: Configure
         run: scripts/in_container.sh cmake --preset dev -DCRATCHET_WERROR=ON
       - name: Build cratchet
-        run: scripts/in_container.sh cmake --build --preset dev --target cratchet
+        run: scripts/in_container.sh cmake --build --preset dev --target cratchet cratchet_tests
       - name: Normalize the sample capture
         run: >
           scripts/in_container.sh build/dev/apps/cratchet normalize
@@ -169,3 +171,30 @@ jobs:
         run: >
           uv run --project .ledgerflux --frozen python scripts/contract_check.py
           .ledgerflux tests/data/coinbase_sample.jsonl ticks.tsv
+      - name: Start NATS with JetStream
+        run: |
+          docker run -d --name nats -p 4222:4222 nats:2.10.22 -js
+          for _ in $(seq 30); do
+            (echo > /dev/tcp/127.0.0.1/4222) 2>/dev/null && exit 0
+            sleep 1
+          done
+          docker logs nats
+          exit 1
+      - name: NATS publisher integration tests
+        env:
+          CRATCHET_DOCKER_NETWORK: host
+          CRATCHET_NATS_URL: nats://localhost:4222
+        run: >
+          scripts/in_container.sh build/dev/tests/cratchet_tests
+          --gtest_filter='nats_publisher*'
+      - name: Publish the sample capture to JetStream
+        env:
+          CRATCHET_DOCKER_NETWORK: host
+        run: |
+          echo '{"urls": "nats://localhost:4222"}' > nats.config.json
+          scripts/in_container.sh build/dev/apps/cratchet normalize --publish \
+            --nats-config nats.config.json tests/data/coinbase_sample.jsonl > published.tsv
+      - name: Read the stream back as LedgerFlux consumers do
+        run: >
+          uv run --project .ledgerflux --frozen python scripts/nats_check.py
+          .ledgerflux nats://localhost:4222 market_ticks market.ticks published.tsv
