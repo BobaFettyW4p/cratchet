@@ -2,6 +2,7 @@ find_package(OpenSSL REQUIRED)
 find_package(simdjson CONFIG REQUIRED)
 
 add_library(cratchet_core STATIC
+  capture.cpp
   coinbase/parser.cpp
   json.cpp
   normalizer.cpp

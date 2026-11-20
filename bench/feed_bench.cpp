@@ -3,18 +3,14 @@
 // benchmark machine (README.md); CI and laptop runs are for spotting large regressions.
 
 #include <benchmark/benchmark.h>
-#include <simdjson.h>
 
-#include <algorithm>
 #include <cstdint>
-#include <cstdlib>
-#include <fstream>
-#include <iostream>
 #include <string>
 #include <string_view>
 #include <variant>
 #include <vector>
 
+#include "cratchet/capture.hpp"
 #include "cratchet/coinbase/parser.hpp"
 #include "cratchet/json.hpp"
 #include "cratchet/normalizer.hpp"
@@ -31,26 +27,14 @@ struct sample {
   std::string l2update;             // largest l2update frame
 };
 
-// Loads the capture once. Exits if it is missing, since every benchmark needs it.
+// Loads the capture once. Throws if it is missing, since every benchmark needs it.
 const sample& load_sample() {
   static const sample loaded = [] {
-    const std::string path = std::string(CRATCHET_BENCH_DATA_DIR) + "/coinbase_sample.jsonl";
-    std::ifstream in(path);
-    if (!in) {
-      std::cerr << "cannot open " << path << '\n';
-      std::exit(1);
-    }
     sample s;
-    simdjson::ondemand::parser json;
-    for (std::string line; std::getline(in, line);) {
-      const simdjson::padded_string padded(line);
-      std::string_view msg;
-      auto doc = json.iterate(padded);
-      if (doc["msg"].get_string().get(msg) != simdjson::SUCCESS) {
-        std::cerr << "bad capture line in " << path << '\n';
-        std::exit(1);
-      }
-      s.frames.emplace_back(msg);
+    cratchet::capture_reader capture(std::string(CRATCHET_BENCH_DATA_DIR) +
+                                     "/coinbase_sample.jsonl");
+    while (const auto frame = capture.next()) {
+      s.frames.emplace_back(frame->msg);
     }
     parser p;
     for (const auto& frame : s.frames) {
