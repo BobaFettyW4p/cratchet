@@ -15,7 +15,7 @@ stream over a lock-free SPSC ring buffer and maintains a cache-friendly limit
 order book. Recorded feeds can be replayed deterministically for tests and
 benchmarks. An MCP server exposes the engine to an agent, and an eval harness
 scores that agent against fault-injected replays. See [PLAN.md](PLAN.md) for the
-staged roadmap; the project is at Stage 0 (scaffolding).
+staged roadmap; the project is in Stage 1 (feed handler and normalizer).
 
 ## Layout
 

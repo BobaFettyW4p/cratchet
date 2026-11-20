@@ -116,13 +116,16 @@ requires the CI checks to merge.
 
 ### Stage 1 — Feed handler + normalizer (~2–3 weeks)
 - [ ] WebSocket client (Beast) with TLS, reconnect + backoff, heartbeat handling
-- [ ] Parse Coinbase messages with simdjson into typed structs
+- [x] Parse Coinbase messages with simdjson into typed structs
       (`std::variant` for message types, `std::string_view` / `std::span` on the hot path)
-- [ ] Normalize to the `Tick` schema; publish to NATS JetStream with the right sharding
+- [x] Normalize to the `Tick` schema with LedgerFlux validation and sharding
+- [ ] Publish to NATS JetStream on `market.ticks.<shard>`
 - [ ] Config via JSON (match LedgerFlux `ingestor.json` shape)
 - [ ] Prometheus metrics: messages/sec, parse latency, publish latency, reconnects
 - [ ] Record raw feed to a file (needed for Stage 2 replay)
 - [ ] Contract test: Python `Tick` model validates every message Cratchet emits
+      (byte-level comparison against a LedgerFlux golden file is done; running
+      pydantic itself in CI is not)
 
 **Done when:** Cratchet replaces the Python ingestor in LedgerFlux and the
 Grafana dashboards still work. First latency/throughput comparison captured.

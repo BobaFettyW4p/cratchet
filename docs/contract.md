@@ -84,9 +84,12 @@ Encoding rules:
   whitespace, but **Cratchet should match the order and compactness anyway**, so
   that byte-level diffs against the Python output stay readable.
 - `px` and `qty` are JSON numbers (float64). Coinbase sends them as decimal
-  strings; Python converts them with `float()`. Cratchet should do the same and
-  emit the shortest round-trip representation (`std::to_chars`), which matches
-  Python's `repr`. Don't add precision the float doesn't have.
+  strings; Python converts them with `float()`. Cratchet does the same and
+  emits the shortest round-trip digits. The layout is pydantic's, not Python's
+  `repr`: pydantic-core formats floats as Rust's ryu does, so `1e-05` is
+  `0.00001`, `1e-07` is `1e-7` and `1.5e+16` is `1.5e16`. Integral values keep
+  a `.0` (`43000.0`). `cratchet::json::append_double` reproduces this; its
+  tests pin vectors taken from pydantic.
 - `seq`, `ts_event` and `ts_ingest` must be JSON integers. A float would be
   accepted by pydantic in lax mode, but Postgres stores them as integers.
 - A trade/bid/ask object is emitted only if **both** of its source fields are
@@ -281,6 +284,12 @@ and add `cratchet_*` histograms with µs-scale buckets for the benchmark story.
    field by field: exact for `product`, `seq`, `px` and `qty`; `|Δ| < 1 µs` for
    `ts_event`; `ts_ingest` is not compared.
 4. Assert the shard for every product matches `shard_product`.
+
+Status: steps 1, 3 and 4 run in `tests/replay_test.cpp` against a committed
+sample (`tests/data/`). The Python side is a golden file generated once by
+`scripts/make_golden_ticks.py`, and the comparison is byte for byte apart from
+`ts_event`. Step 2, running pydantic against Cratchet's output in CI, is still
+to do.
 
 ## 9. Coinbase channel access (checked 2026-11-19)
 
