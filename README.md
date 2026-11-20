@@ -59,6 +59,21 @@ CI and benchmarks run on x86_64. Default builds avoid `-march=native` so the sam
 configuration works on both. Benchmark numbers are only meaningful from the
 documented x86_64 machine, never from CI runners or a laptop.
 
+## Running
+
+```bash
+# Live feed, ticks printed instead of published, raw frames recorded for replay:
+build/dev/apps/cratchet run --config path/to/ingestor.json --dry-run --record feed.jsonl
+
+# Replay a recording through the parser and normalizer:
+build/dev/apps/cratchet normalize feed.jsonl
+```
+
+`cratchet run` reads the same `config.json` and `nats.config.json` as the LedgerFlux
+ingestor (by default at the paths its Deployment mounts). It reconnects with
+exponential backoff and treats 5 s without any frame as a stale feed (heartbeats
+arrive every second per product). Run `cratchet` with no arguments for all options.
+
 ## Conventions
 
 Namespace `cratchet`, `snake_case` for files and identifiers (private members get

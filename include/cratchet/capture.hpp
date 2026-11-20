@@ -39,4 +39,25 @@ class capture_reader {
   std::size_t line_number_ = 0;
 };
 
+// Writes feed captures in the same format as capture_reader reads and
+// scripts/capture_coinbase.py writes: {"recv_ns": <int>, "msg": "<raw frame>"} per line.
+// Buffered; call flush() to push complete lines to disk (also done on destruction).
+class capture_writer {
+ public:
+  // Appends to `path`, creating it if needed. Throws std::runtime_error if it cannot be opened.
+  explicit capture_writer(const std::string& path);
+
+  // Throws std::runtime_error if the write fails (e.g. disk full).
+  void write(std::int64_t recv_ns, std::string_view msg);
+  void flush();
+
+  [[nodiscard]] std::size_t frames_written() const noexcept { return frames_; }
+
+ private:
+  std::ofstream out_;
+  std::string path_;
+  std::string line_;
+  std::size_t frames_ = 0;
+};
+
 }  // namespace cratchet

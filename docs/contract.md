@@ -177,8 +177,10 @@ so book gap detection can't come from the depth channel or from `Tick.seq`.
 ### Heartbeats
 
 The ingestor subscribes to `heartbeat` but ignores it (`ingestor/app.py:179`).
-Cratchet should use heartbeats for liveness (stale-feed detection and
-reconnect) and must not publish them as ticks.
+Cratchet uses them for liveness and does not publish them as ticks: with
+heartbeats subscribed, 5 s without any frame closes the connection and
+reconnects (60 s without them). The Python ingestor never reconnects; its
+WebSocket loop exits on the first disconnect.
 
 ### Other message types
 

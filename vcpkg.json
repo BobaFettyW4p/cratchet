@@ -4,6 +4,12 @@
   "builtin-baseline": "8f363bdc11359ede4bc51e5eb32a2617538049c8",
   "dependencies": [
     "benchmark",
+    {
+      "name": "boost-asio",
+      "default-features": false,
+      "features": ["ssl"]
+    },
+    "boost-beast",
     "gtest",
     "openssl",
     "simdjson"
