@@ -119,7 +119,7 @@ requires the CI checks to merge.
 - [x] Parse Coinbase messages with simdjson into typed structs
       (`std::variant` for message types, `std::string_view` / `std::span` on the hot path)
 - [x] Normalize to the `Tick` schema with LedgerFlux validation and sharding
-- [ ] Publish to NATS JetStream on `market.ticks.<shard>`
+- [x] Publish to NATS JetStream on `market.ticks.<shard>`
 - [x] Config via JSON (match LedgerFlux `ingestor.json` shape)
 - [ ] Prometheus metrics: messages/sec, parse latency, publish latency, reconnects
 - [x] Record raw feed to a file (needed for Stage 2 replay)

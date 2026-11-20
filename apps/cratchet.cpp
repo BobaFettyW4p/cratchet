@@ -7,8 +7,10 @@
 #include <csignal>
 #include <cstdint>
 #include <exception>
+#include <format>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -21,6 +23,7 @@
 #include "cratchet/config.hpp"
 #include "cratchet/feed_client.hpp"
 #include "cratchet/log.hpp"
+#include "cratchet/nats_publisher.hpp"
 #include "cratchet/pipeline.hpp"
 #include "cratchet/version.hpp"
 
@@ -34,13 +37,14 @@ constexpr std::string_view usage_text = R"(usage:
       Connect to the feed, normalize tickers and publish them.
         --config PATH       ingestor config (default /app/services/ingestor/config.json)
         --nats-config PATH  NATS config (default /app/services/common/nats.config.json)
-        --dry-run           print ticks to stdout (<subject><TAB><json>) instead of publishing
+        --dry-run           print ticks to stdout (<subject><TAB><json>); no NATS connection
         --record PATH       append every raw frame to PATH (capture format)
         --duration SECONDS  exit after this long (default: run until SIGINT/SIGTERM)
         --verbose           debug logging
-  cratchet normalize [--config PATH] <capture.jsonl>
+  cratchet normalize [--config PATH] [--publish [--nats-config PATH]] <capture.jsonl>
       Replay a recorded feed through the parser and normalizer. Prints one line per tick
-      that would be published, <subject><TAB><json>; a summary goes to stderr.
+      that would be published, <subject><TAB><json>; a summary goes to stderr. With
+      --publish, also publishes each tick to NATS JetStream.
   cratchet --version
 )";
 
@@ -73,12 +77,48 @@ cratchet::ingestor_config load_config_or_throw(const std::string& path) {
   return std::move(config).value();
 }
 
+std::unique_ptr<cratchet::nats_publisher> connect_publisher_or_throw(
+    const std::string& nats_config_path, const cratchet::ingestor_config& config) {
+  auto nats = cratchet::load_nats_config(nats_config_path, config, cratchet::process_env());
+  if (!nats) {
+    throw std::runtime_error(nats.error());
+  }
+  cratchet::log::info("NATS {} stream={} subjects={}.*", nats.value().urls,
+                      nats.value().stream_name, nats.value().subject_prefix);
+  auto publisher = cratchet::nats_publisher::connect(nats.value());
+  if (!publisher) {
+    throw std::runtime_error(publisher.error());
+  }
+  return std::move(publisher).value();
+}
+
+std::string format_publisher_stats(const cratchet::nats_publisher& publisher) {
+  const auto stats = publisher.stats();
+  return std::format("nats_submitted={} nats_acked={} nats_failed={} nats_reconnects={}",
+                     stats.submitted, stats.acked, stats.failed, stats.reconnects);
+}
+
+// Waits for outstanding acks before exit; returns false if some never came.
+bool drain_publisher(cratchet::nats_publisher& publisher) {
+  if (!publisher.flush(std::chrono::seconds(5))) {
+    cratchet::log::error("timed out waiting for NATS acknowledgements");
+    return false;
+  }
+  return true;
+}
+
 int normalize(const std::vector<std::string_view>& args) {
   std::optional<std::string> config_path;
   std::optional<std::string> capture_path;
+  std::string nats_config_path(cratchet::default_nats_config_path);
+  bool publish = false;
   for (std::size_t i = 0; i < args.size(); ++i) {
     if (args[i] == "--config") {
       config_path = take_value(args, i);
+    } else if (args[i] == "--publish") {
+      publish = true;
+    } else if (args[i] == "--nats-config") {
+      nats_config_path = take_value(args, i);
     } else if (!args[i].starts_with("--") && !capture_path) {
       capture_path = std::string(args[i]);
     } else {
@@ -96,17 +136,31 @@ int normalize(const std::vector<std::string_view>& args) {
     config = load_config_or_throw(*config_path);
   }
 
-  cratchet::log::set_min_level(cratchet::log::level::error);
+  cratchet::log::set_min_level(publish ? cratchet::log::level::warn : cratchet::log::level::error);
+  std::unique_ptr<cratchet::nats_publisher> publisher;
+  if (publish) {
+    publisher = connect_publisher_or_throw(nats_config_path, config);
+  }
   cratchet::capture_reader capture(*capture_path);
   cratchet::pipeline pipeline(config,
-                              [](std::string_view subject, const cratchet::normalized_tick& tick) {
+                              [&](std::string_view subject, const cratchet::normalized_tick& tick) {
                                 std::cout << subject << '\t' << tick.json << '\n';
+                                if (publisher) {
+                                  publisher->publish(subject, tick.json);
+                                }
                               });
   while (const auto frame = capture.next()) {
     pipeline.on_frame(frame->msg, frame->recv_ns);
   }
-  std::cerr << cratchet::format_stats(pipeline.stats()) << '\n';
-  return std::cout ? 0 : 1;
+  std::string summary = cratchet::format_stats(pipeline.stats());
+  bool ok = static_cast<bool>(std::cout);
+  if (publisher) {
+    ok = drain_publisher(*publisher) && ok;
+    summary += " " + format_publisher_stats(*publisher);
+    ok = ok && publisher->stats().failed == 0;
+  }
+  std::cerr << summary << '\n';
+  return ok ? 0 : 1;
 }
 
 int run(const std::vector<std::string_view>& args) {
@@ -137,10 +191,6 @@ int run(const std::vector<std::string_view>& args) {
   }
 
   const auto config = load_config_or_throw(config_path);
-  if (!dry_run) {
-    throw usage_error{"publishing to NATS is not implemented yet; use --dry-run"};
-  }
-
   cratchet::log::info("cratchet {} products={} channels={} shards={} uri={}", cratchet::version(),
                       config.products.size(), config.channels.size(), config.num_shards,
                       config.ws_uri);
@@ -151,10 +201,20 @@ int run(const std::vector<std::string_view>& args) {
     cratchet::log::info("recording raw frames to {}", *record_path);
   }
 
+  // Like the Python ingestor, connect to NATS (and set up the stream) before the feed.
+  std::unique_ptr<cratchet::nats_publisher> publisher;
+  if (!dry_run) {
+    publisher = connect_publisher_or_throw(nats_config_path, config);
+  }
+
   cratchet::pipeline pipeline(
       config,
-      [](std::string_view subject, const cratchet::normalized_tick& tick) {
-        std::cout << subject << '\t' << tick.json << '\n';
+      [&](std::string_view subject, const cratchet::normalized_tick& tick) {
+        if (publisher) {
+          publisher->publish(subject, tick.json);
+        } else {
+          std::cout << subject << '\t' << tick.json << '\n';
+        }
       },
       recorder ? &*recorder : nullptr);
 
@@ -226,7 +286,8 @@ int run(const std::vector<std::string_view>& args) {
     stats_timer.expires_after(30s);
     stats_timer.async_wait([&](const boost::system::error_code& ec) {
       if (!ec) {
-        cratchet::log::info("stats {}", cratchet::format_stats(pipeline.stats()));
+        cratchet::log::info("stats {}{}", cratchet::format_stats(pipeline.stats()),
+                            publisher ? " " + format_publisher_stats(*publisher) : "");
         schedule_stats();
       }
     });
@@ -245,19 +306,20 @@ int run(const std::vector<std::string_view>& args) {
   io.run();
 
   std::cout.flush();
+  if (publisher && !drain_publisher(*publisher)) {
+    exit_code = 1;
+  }
   if (recorder) {
     recorder->flush();
     cratchet::log::info("recorded {} frames", recorder->frames_written());
   }
-  cratchet::log::info("final stats {} connections={}", cratchet::format_stats(pipeline.stats()),
-                      client->connections());
+  cratchet::log::info("final stats {} connections={}{}", cratchet::format_stats(pipeline.stats()),
+                      client->connections(),
+                      publisher ? " " + format_publisher_stats(*publisher) : "");
   return exit_code;
 }
 
-}  // namespace
-
-int main(int argc, char** argv) {
-  const std::vector<std::string_view> args(argv + 1, argv + argc);
+int dispatch(const std::vector<std::string_view>& args) {
   try {
     if (args.size() == 1 && args[0] == "--version") {
       std::cout << "cratchet " << cratchet::version() << '\n';
@@ -278,4 +340,12 @@ int main(int argc, char** argv) {
     std::cerr << "cratchet: " << e.what() << '\n';
     return 1;
   }
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  const int code = dispatch(std::vector<std::string_view>(argv + 1, argv + argc));
+  cratchet::nats_publisher::shutdown_library();
+  return code;
 }

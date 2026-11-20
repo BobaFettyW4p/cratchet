@@ -240,6 +240,13 @@ existing stream. Otherwise, optionally delete it, then create it with
 `subjects = ["<prefix>.*"]`. NATS connect retries with exponential backoff
 (1, 2, 4, 8 s…) for up to 60 s.
 
+Cratchet (`include/cratchet/nats_publisher.hpp`) does the same, with two
+deliberate differences. It publishes asynchronously and counts
+acknowledgements on the client library's threads, where Python awaits each
+publish. And after the first connect it reconnects forever, buffering
+publishes meanwhile; a NATS restart mid-run lost no messages in testing. A
+message that gets no ack within 5 s counts as failed.
+
 The ingestor calls `load_nats_config(stream_name=..., subject_prefix=...)`
 with the values from its own config (or their defaults). Because explicit
 arguments win, `JS_STREAM_NAME`, `JS_SUBJECT_PREFIX` and the file's
@@ -295,7 +302,10 @@ and add `cratchet_*` histograms with µs-scale buckets for the benchmark story.
    `ts_event`; `ts_ingest` is not compared.
 4. Assert the shard for every product matches `shard_product`.
 
-Status: all four steps run in the CI `contract` job. `cratchet normalize`
+Status: all four steps run in the CI `contract` job, which then also
+publishes the sample to a real JetStream server (`cratchet normalize
+--publish`) and reads it back with nats-py and `Tick.model_validate`, as the
+gateway and snapshotter do (`scripts/nats_check.py`). `cratchet normalize`
 replays the committed sample (`tests/data/`) and prints each tick as it would be
 published (`<subject>\t<json>`). `scripts/contract_check.py` then runs
 LedgerFlux's own transform, normalizer validation, `Tick` model and

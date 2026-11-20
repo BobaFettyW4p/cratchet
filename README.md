@@ -62,17 +62,31 @@ documented x86_64 machine, never from CI runners or a laptop.
 ## Running
 
 ```bash
-# Live feed, ticks printed instead of published, raw frames recorded for replay:
+# Live feed to NATS JetStream, as the LedgerFlux ingestor does:
+build/dev/apps/cratchet run --config path/to/ingestor.json --nats-config path/to/nats.config.json
+
+# No NATS: print ticks instead, and record raw frames for replay:
 build/dev/apps/cratchet run --config path/to/ingestor.json --dry-run --record feed.jsonl
 
-# Replay a recording through the parser and normalizer:
+# Replay a recording through the parser and normalizer (add --publish to send it to NATS):
 build/dev/apps/cratchet normalize feed.jsonl
 ```
 
 `cratchet run` reads the same `config.json` and `nats.config.json` as the LedgerFlux
-ingestor (by default at the paths its Deployment mounts). It reconnects with
-exponential backoff and treats 5 s without any frame as a stale feed (heartbeats
-arrive every second per product). Run `cratchet` with no arguments for all options.
+ingestor (by default at the paths its Deployment mounts), with the same environment
+overrides (`NATS_URLS`, ...). It reconnects to the feed with exponential backoff and
+treats 5 s without any frame as a stale feed (heartbeats arrive every second per
+product); the NATS connection reconnects on its own. Run `cratchet` with no arguments
+for all options.
+
+The NATS publisher tests need a JetStream server and are skipped otherwise:
+
+```bash
+docker network create cratchet-test
+docker run -d --rm --name cratchet-nats --network cratchet-test nats:2.10.22 -js
+CRATCHET_DOCKER_NETWORK=cratchet-test CRATCHET_NATS_URL=nats://cratchet-nats:4222 \
+  scripts/in_container.sh ctest --preset dev
+```
 
 ## Conventions
 

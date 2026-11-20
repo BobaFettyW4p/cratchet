@@ -1,6 +1,7 @@
 find_package(GTest CONFIG REQUIRED)
 find_package(boost_asio CONFIG REQUIRED)
 find_package(boost_beast CONFIG REQUIRED)
+find_package(cnats CONFIG REQUIRED)
 
 add_executable(cratchet_tests
   capture_test.cpp
@@ -10,6 +11,7 @@ add_executable(cratchet_tests
   feed_pieces_test.cpp
   hello_test.cpp
   json_test.cpp
+  nats_publisher_test.cpp
   normalizer_test.cpp
   pipeline_test.cpp
   replay_test.cpp
@@ -24,6 +26,7 @@ target_link_libraries(cratchet_tests PRIVATE
   cratchet::core
   Boost::asio
   Boost::beast
+  cnats::nats_static
   GTest::gtest_main)
 
 include(GoogleTest)

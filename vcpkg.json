@@ -7,9 +7,12 @@
     {
       "name": "boost-asio",
       "default-features": false,
-      "features": ["ssl"]
+      "features": [
+        "ssl"
+      ]
     },
     "boost-beast",
+    "cnats",
     "gtest",
     "openssl",
     "simdjson"
