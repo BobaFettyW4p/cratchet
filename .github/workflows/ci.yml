@@ -125,3 +125,47 @@ jobs:
         run: >
           git ls-files '*.cpp' '*.hpp'
           | xargs clang-format-18 --dry-run --Werror
+
+  # docs/contract.md §8: run Cratchet over the committed capture and check every tick with
+  # LedgerFlux's own Python code (transform, validation, Tick model, shard_product) at a
+  # pinned commit. Bump LEDGERFLUX_COMMIT when LedgerFlux's Tick or ingestor changes.
+  contract:
+    name: contract (ledgerflux)
+    runs-on: ubuntu-24.04
+    env:
+      LEDGERFLUX_COMMIT: 004a8c78165e2281076a226d6fbca26aa7ea223d
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: BobaFettyW4p/LedgerFlux
+          ref: ${{ env.LEDGERFLUX_COMMIT }}
+          path: .ledgerflux
+      - uses: docker/setup-buildx-action@v3
+      - name: Build toolchain image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/dev.Dockerfile
+          load: true
+          tags: ${{ env.CRATCHET_IMAGE }}
+          cache-from: type=gha,scope=toolchain
+          cache-to: type=gha,scope=toolchain,mode=max
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_CACHE_DIR }}
+          key: vcpkg-clang-18-${{ hashFiles('vcpkg.json', 'docker/dev.Dockerfile') }}
+          restore-keys: vcpkg-clang-18-
+      - name: Configure
+        run: scripts/in_container.sh cmake --preset dev -DCRATCHET_WERROR=ON
+      - name: Build cratchet
+        run: scripts/in_container.sh cmake --build --preset dev --target cratchet
+      - name: Normalize the sample capture
+        run: >
+          scripts/in_container.sh build/dev/apps/cratchet normalize
+          tests/data/coinbase_sample.jsonl > ticks.tsv
+      - uses: astral-sh/setup-uv@v6
+      - name: Check against LedgerFlux
+        run: >
+          uv run --project .ledgerflux --frozen python scripts/contract_check.py
+          .ledgerflux tests/data/coinbase_sample.jsonl ticks.tsv

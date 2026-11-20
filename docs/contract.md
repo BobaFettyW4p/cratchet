@@ -285,11 +285,14 @@ and add `cratchet_*` histograms with µs-scale buckets for the benchmark story.
    `ts_event`; `ts_ingest` is not compared.
 4. Assert the shard for every product matches `shard_product`.
 
-Status: steps 1, 3 and 4 run in `tests/replay_test.cpp` against a committed
-sample (`tests/data/`). The Python side is a golden file generated once by
-`scripts/make_golden_ticks.py`, and the comparison is byte for byte apart from
-`ts_event`. Step 2, running pydantic against Cratchet's output in CI, is still
-to do.
+Status: all four steps run in the CI `contract` job. `cratchet normalize`
+replays the committed sample (`tests/data/`) and prints each tick as it would be
+published (`<subject>\t<json>`). `scripts/contract_check.py` then runs
+LedgerFlux's own transform, normalizer validation, `Tick` model and
+`shard_product` at the pinned commit, and requires every payload to match
+pydantic's output byte for byte apart from `ts_event` and `ts_ingest`.
+`tests/replay_test.cpp` makes the same comparison without Python, against a
+golden file from `scripts/make_golden_ticks.py`.
 
 ## 9. Coinbase channel access (checked 2026-11-19)
 

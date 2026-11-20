@@ -123,9 +123,8 @@ requires the CI checks to merge.
 - [ ] Config via JSON (match LedgerFlux `ingestor.json` shape)
 - [ ] Prometheus metrics: messages/sec, parse latency, publish latency, reconnects
 - [ ] Record raw feed to a file (needed for Stage 2 replay)
-- [ ] Contract test: Python `Tick` model validates every message Cratchet emits
-      (byte-level comparison against a LedgerFlux golden file is done; running
-      pydantic itself in CI is not)
+- [x] Contract test: Python `Tick` model validates every message Cratchet emits
+      (CI `contract` job, against a pinned LedgerFlux commit)
 
 **Done when:** Cratchet replaces the Python ingestor in LedgerFlux and the
 Grafana dashboards still work. First latency/throughput comparison captured.

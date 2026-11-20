@@ -14,6 +14,7 @@
 #include <variant>
 #include <vector>
 
+#include "cratchet/capture.hpp"
 #include "cratchet/coinbase/parser.hpp"
 #include "cratchet/normalizer.hpp"
 #include "cratchet/shard.hpp"
@@ -28,15 +29,6 @@ std::vector<std::string> read_lines(const std::string& path) {
     lines.push_back(line);
   }
   return lines;
-}
-
-// Capture lines are {"recv_ns": ..., "msg": "<raw frame>"}.
-std::string frame_of(simdjson::ondemand::parser& json, const std::string& line) {
-  simdjson::padded_string padded(line);
-  std::string_view msg;
-  auto doc = json.iterate(padded);
-  EXPECT_EQ(doc["msg"].get_string().get(msg), simdjson::SUCCESS) << line;
-  return std::string(msg);
 }
 
 std::int64_t ts_event_of(simdjson::ondemand::parser& json, const std::string& tick_json) {
@@ -58,9 +50,8 @@ std::string with_ts_event(std::string tick_json, std::int64_t ts_event) {
 
 TEST(replay, capture_matches_ledgerflux_transform) {
   const std::string dir = CRATCHET_TEST_DATA_DIR;
-  const auto capture = read_lines(dir + "/coinbase_sample.jsonl");
+  cratchet::capture_reader capture(dir + "/coinbase_sample.jsonl");
   const auto golden = read_lines(dir + "/coinbase_sample.ticks.jsonl");
-  ASSERT_FALSE(capture.empty());
 
   simdjson::ondemand::parser json;
   cratchet::coinbase::parser parser;
@@ -68,8 +59,8 @@ TEST(replay, capture_matches_ledgerflux_transform) {
   std::map<std::string, int> counts;
   std::size_t tick_index = 0;
 
-  for (const auto& line : capture) {
-    const std::string frame = frame_of(json, line);
+  while (const auto captured = capture.next()) {
+    const std::string_view frame = captured->msg;
     auto parsed = parser.parse(frame);
     ASSERT_TRUE(parsed) << to_string(parsed.error().code) << " '" << parsed.error().field << "' in "
                         << frame;
