@@ -6,7 +6,7 @@ roadmap and scope, and `docs/contract.md` for the LedgerFlux contract.
 
 ## Environment
 
-The toolchain (Clang 18, GCC 13, CMake, Ninja, vcpkg) is already on the path when you run
+The toolchain (Clang 18, CMake, Ninja, vcpkg) is already on the path when you run
 in the sandbox image, so call the tools directly. `scripts/in_container.sh` wraps
 `docker run` and does not work there: **do not use it**. (On a developer machine without
 the toolchain, `scripts/in_container.sh <cmd>` runs the same commands in the `cratchet-dev`
@@ -43,6 +43,9 @@ in `tests/CMakeLists.txt`).
   the documented x86_64 machine.
 - **The live Coinbase feed** (`cratchet run` without `--dry-run`, `scripts/capture_coinbase.py`).
   Use `tests/data/` captures and `cratchet normalize <file>` instead.
+
+The sandbox has no GCC 13, so CI's `gcc-13` build leg cannot be reproduced; if you need to
+reason about GCC-specific behavior, say so in your final message.
 
 ## Conventions
 
