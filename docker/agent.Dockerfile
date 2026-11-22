@@ -15,8 +15,14 @@ USER root
 ARG VCPKG_COMMIT=8f363bdc11359ede4bc51e5eb32a2617538049c8
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      g++-13 gcc-13 \
+# The base image is Debian bookworm, which has neither Clang 18 nor GCC 13 (dev.Dockerfile
+# targets Ubuntu 24.04). Clang 18 comes from LLVM's apt repo. The compiler is GCC 12 from
+# build-essential for any GCC use; CI's gcc-13 leg is not reproduced here.
+RUN mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o /etc/apt/keyrings/apt.llvm.org.asc \
+    && echo "deb [signed-by=/etc/apt/keyrings/apt.llvm.org.asc] http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-18 main" \
+         > /etc/apt/sources.list.d/llvm-18.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
       clang-18 clang-tidy-18 clang-format-18 libclang-rt-18-dev \
       cmake ninja-build pkg-config \
       zip unzip tar gdb \
