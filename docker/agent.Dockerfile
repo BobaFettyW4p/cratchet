@@ -49,7 +49,10 @@ COPY vcpkg.json /tmp/vcpkg-warm/vcpkg.json
 RUN ${VCPKG_ROOT}/vcpkg install --x-manifest-root=/tmp/vcpkg-warm \
       --x-install-root=/tmp/vcpkg-warm/installed \
     && rm -rf /tmp/vcpkg-warm \
-    && chmod -R a+rwX ${VCPKG_DEFAULT_BINARY_CACHE}
+    && chmod -R a+rwX ${VCPKG_ROOT} ${VCPKG_DEFAULT_BINARY_CACHE}
+# The warm-up above runs as root and creates files under ${VCPKG_ROOT} (for example
+# buildtrees/vcpkg-running.lock) after the earlier chmod, so the tree is made writable again
+# here. Without it an agent running as uid 1000 cannot take vcpkg's lock and cannot configure.
 
 USER node
 WORKDIR /work
