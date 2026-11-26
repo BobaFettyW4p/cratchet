@@ -15,12 +15,13 @@ USER root
 ARG VCPKG_COMMIT=8f363bdc11359ede4bc51e5eb32a2617538049c8
 ENV DEBIAN_FRONTEND=noninteractive
 
-# The base image is Debian bookworm, which has neither Clang 18 nor GCC 13 (dev.Dockerfile
-# targets Ubuntu 24.04). Clang 18 comes from LLVM's apt repo. The compiler is GCC 12 from
-# build-essential for any GCC use; CI's gcc-13 leg is not reproduced here.
+# The base image is Debian trixie (13), whose libstdc++ 14 provides <format> (cratchet's log.hpp
+# needs it; bookworm's libstdc++ 12 does not). Trixie has neither Clang 18 nor GCC 13 (dev.Dockerfile
+# targets Ubuntu 24.04). Clang 18 comes from LLVM's apt repo. The compiler is GCC 14 from
+# build-essential for any GCC use; CI's gcc-13 leg is not reproduced exactly.
 RUN mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o /etc/apt/keyrings/apt.llvm.org.asc \
-    && echo "deb [signed-by=/etc/apt/keyrings/apt.llvm.org.asc] http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-18 main" \
+    && echo "deb [signed-by=/etc/apt/keyrings/apt.llvm.org.asc] http://apt.llvm.org/trixie/ llvm-toolchain-trixie-18 main" \
          > /etc/apt/sources.list.d/llvm-18.list \
     && apt-get update && apt-get install -y --no-install-recommends \
       clang-18 clang-tidy-18 clang-format-18 libclang-rt-18-dev \
@@ -49,7 +50,10 @@ COPY vcpkg.json /tmp/vcpkg-warm/vcpkg.json
 RUN ${VCPKG_ROOT}/vcpkg install --x-manifest-root=/tmp/vcpkg-warm \
       --x-install-root=/tmp/vcpkg-warm/installed \
     && rm -rf /tmp/vcpkg-warm \
-    && chmod -R a+rwX ${VCPKG_DEFAULT_BINARY_CACHE}
+    && chmod -R a+rwX ${VCPKG_ROOT} ${VCPKG_DEFAULT_BINARY_CACHE}
+# The warm-up above runs as root and creates files under ${VCPKG_ROOT} (for example
+# buildtrees/vcpkg-running.lock) after the earlier chmod, so the tree is made writable again
+# here. Without it an agent running as uid 1000 cannot take vcpkg's lock and cannot configure.
 
 USER node
 WORKDIR /work

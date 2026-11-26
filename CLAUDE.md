@@ -44,8 +44,8 @@ in `tests/CMakeLists.txt`).
 - **The live Coinbase feed** (`cratchet run` without `--dry-run`, `scripts/capture_coinbase.py`).
   Use `tests/data/` captures and `cratchet normalize <file>` instead.
 
-The sandbox has no GCC 13, so CI's `gcc-13` build leg cannot be reproduced; if you need to
-reason about GCC-specific behavior, say so in your final message.
+The sandbox has GCC 14, not CI's GCC 13, so the `gcc-13` build leg is only approximated; if you
+need to reason about GCC-specific behavior, say so in your final message.
 
 ## Conventions
 
