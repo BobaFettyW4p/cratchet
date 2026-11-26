@@ -81,7 +81,7 @@ class order_book {
   [[nodiscard]] std::uint64_t absent_removals() const noexcept { return absent_removals_; }
 
  private:
-  std::optional<std::int64_t> to_ticks(double price) const;
+  [[nodiscard]] std::optional<std::int64_t> to_ticks(double price) const;
   void set_level(coinbase::side side, std::int64_t ticks, double size);
 
   double tick_size_;

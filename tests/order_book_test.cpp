@@ -83,7 +83,7 @@ void add_levels(order_book& book) {
 TEST(order_book, rejects_bad_tick_size) {
   EXPECT_THROW(order_book(0.0), std::invalid_argument);
   EXPECT_THROW(order_book(-0.01), std::invalid_argument);
-  EXPECT_THROW(order_book(std::numeric_limits<double>::infinity()), std::invalid_argument);
+  EXPECT_THROW(order_book{std::numeric_limits<double>::infinity()}, std::invalid_argument);
 }
 
 TEST(order_book, snapshot_sets_both_sides) {
@@ -306,10 +306,15 @@ TEST(order_book, capture_replay_keeps_invariants) {
     if (next_checkpoint < checkpoints.size() && checkpoints[next_checkpoint].ordinal == ordinal) {
       const auto& expected = checkpoints[next_checkpoint++];
       ASSERT_EQ(product, expected.product) << "ordinal " << ordinal;
-      EXPECT_EQ(book.best_bid()->price_ticks, expected.top_bid.price_ticks) << ordinal;
-      EXPECT_DOUBLE_EQ(book.best_bid()->size, expected.top_bid.size) << ordinal;
-      EXPECT_EQ(book.best_ask()->price_ticks, expected.top_ask.price_ticks) << ordinal;
-      EXPECT_DOUBLE_EQ(book.best_ask()->size, expected.top_ask.size) << ordinal;
+      const auto bid = book.best_bid();
+      const auto ask = book.best_ask();
+      if (!bid.has_value() || !ask.has_value()) {
+        FAIL() << "empty top of book at ordinal " << ordinal;
+      }
+      EXPECT_EQ(bid->price_ticks, expected.top_bid.price_ticks) << ordinal;
+      EXPECT_DOUBLE_EQ(bid->size, expected.top_bid.size) << ordinal;
+      EXPECT_EQ(ask->price_ticks, expected.top_ask.price_ticks) << ordinal;
+      EXPECT_DOUBLE_EQ(ask->size, expected.top_ask.size) << ordinal;
       EXPECT_EQ(book.level_count(buy), expected.bid_count) << ordinal;
       EXPECT_EQ(book.level_count(sell), expected.ask_count) << ordinal;
       EXPECT_EQ(book.absent_removals(), expected.absent) << ordinal;
