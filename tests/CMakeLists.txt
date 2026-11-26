@@ -13,6 +13,7 @@ add_executable(cratchet_tests
   json_test.cpp
   nats_publisher_test.cpp
   normalizer_test.cpp
+  order_book_test.cpp
   pipeline_test.cpp
   replay_test.cpp
   result_test.cpp
