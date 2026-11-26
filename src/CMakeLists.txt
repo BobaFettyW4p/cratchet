@@ -15,6 +15,7 @@ add_library(cratchet_core STATIC
   log.cpp
   nats_publisher.cpp
   normalizer.cpp
+  order_book.cpp
   pipeline.cpp
   shard.cpp
   tick.cpp
