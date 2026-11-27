@@ -12,6 +12,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(CRATCHET_BUILD_TESTS "Build unit tests" ON)
 option(CRATCHET_BUILD_BENCH "Build benchmarks" ON)
+option(CRATCHET_BUILD_FUZZ "Build libFuzzer targets (needs Clang; see the fuzz preset)" OFF)
 option(CRATCHET_WERROR "Treat compiler warnings as errors" OFF)
 set(CRATCHET_SANITIZERS "" CACHE STRING
     "Comma-separated sanitizers to enable, e.g. address,undefined or thread")
@@ -44,4 +45,8 @@ endif()
 
 if(CRATCHET_BUILD_BENCH)
   add_subdirectory(bench)
+endif()
+
+if(CRATCHET_BUILD_FUZZ)
+  add_subdirectory(fuzz)
 endif()

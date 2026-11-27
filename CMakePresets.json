@@ -38,13 +38,27 @@
       "displayName": "Release",
       "inherits": "base",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "fuzz",
+      "displayName": "libFuzzer targets (Clang, ASan + UBSan, coverage-instrumented library)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_COMPILER": "clang++-18",
+        "CRATCHET_BUILD_FUZZ": "ON",
+        "CRATCHET_BUILD_TESTS": "OFF",
+        "CRATCHET_BUILD_BENCH": "OFF",
+        "CRATCHET_SANITIZERS": "address,undefined,fuzzer-no-link"
+      }
     }
   ],
   "buildPresets": [
     { "name": "dev", "configurePreset": "dev" },
     { "name": "asan", "configurePreset": "asan" },
     { "name": "tsan", "configurePreset": "tsan" },
-    { "name": "release", "configurePreset": "release" }
+    { "name": "release", "configurePreset": "release" },
+    { "name": "fuzz", "configurePreset": "fuzz", "targets": ["coinbase_parser_fuzz"] }
   ],
   "testPresets": [
     {
